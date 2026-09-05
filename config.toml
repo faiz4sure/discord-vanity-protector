@@ -1,0 +1,99 @@
+# ==============================================================================
+# DISCORD VANITY PROTECTOR (DVP) - CONFIGURATION FILE
+# ==============================================================================
+# INSTRUCTIONS:
+# 1. Fill in your Discord account token, server ID, and target vanity code.
+# 2. Save this file as `config.toml` in the same directory as the executable.
+# 3. Never share your token or password with anyone!
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# ACCOUNT & SERVER SETTINGS
+# ------------------------------------------------------------------------------
+[selfbot]
+# YOUR DISCORD USER ACCOUNT TOKEN (NEVER SHARE THIS WITH ANYONE!)
+# How to get: Open Discord in browser > Ctrl+Shift+I > Application > Local Storage > token
+token = ""
+
+# SERVER ID TO PROTECT
+# Right-click your server icon > Copy Server ID
+server_id = ""
+
+
+# ------------------------------------------------------------------------------
+# VANITY URL PROTECTION SETTINGS
+# ------------------------------------------------------------------------------
+[vanity]
+# TARGET VANITY CODE TO PROTECT
+# Enter ONLY the vanity slug (e.g. "myserver", NOT "discord.gg/myserver")
+code = ""
+
+# VANITY PROTECTION MODE
+# Options:
+#  - "audit"  : (RECOMMENDED) Uses Gateway GUILD_AUDIT_LOG_ENTRY_CREATE for instant
+#               attacker detection and immediate MFA vanity reversion + punishment.
+#  - "normal" : Uses GUILD_UPDATE event combined with REST Audit Log fetch.
+#  - "fast"   : Sub-millisecond instant vanity reversion without waiting for audit logs
+#               (Maximum speed reversion, no punishment).
+mode = "audit"
+
+# DISCORD ACCOUNT PASSWORD (REQUIRED FOR AUTOMATIC MFA REVERSION)
+# Discord requires password-based 2FA/MFA elevation to update server vanity URLs.
+#  - Keep this password secure and never share it.
+#  - If incorrect or empty, attacker punishment will still work, but vanity reversion
+#    will fail unless MFA ticket is cached.
+#  - Successfully generated MFA tickets are cached in-memory for 270 seconds.
+password = ""
+
+
+# ------------------------------------------------------------------------------
+# SECURITY & PUNISHMENT SETTINGS
+# ------------------------------------------------------------------------------
+[security]
+# MANAGERS (MAX 2 USER IDs ALLOWED TO INTENTIONALLY CHANGE/UPDATE VANITY)
+# Users listed here can change the server vanity URL without triggering protection.
+# All configured managers will also receive ping mentions (@manager) on webhook alerts.
+# Example: ["123456789012345678", "987654321098765432"]
+managers = []
+
+# WHITELISTED USERS (EXEMPT FROM ATTACKER PUNISHMENT)
+# Trusted admin user IDs who will not be banned/kicked if they trigger changes.
+# Example: ["112233445566778899"]
+whitelisted = []
+
+# ATTACKER PUNISHMENT ACTION
+# Options:
+#  - "ban"  : Automatically bans the attacker from the server (RECOMMENDED).
+#  - "kick" : Kicks the attacker from the server.
+punishment = "ban"
+
+
+# ------------------------------------------------------------------------------
+# LOGGING & WEBHOOK NOTIFICATIONS
+# ------------------------------------------------------------------------------
+[logging]
+# TRACING LOG LEVEL
+# Options: "trace", "debug", "info", "warn", "error"
+#  - "info"  : Standard operational logs, alerts, and warnings (RECOMMENDED).
+#  - "debug" : Detailed engine debugging (audit logs, raw socket state).
+level = "info"
+
+# DISCORD WEBHOOK URL FOR INCIDENT & TOKEN ALERTS
+# Single Webhook URL to receive alerts for vanity security incidents, punishment logs,
+# and token health failures. Leave empty ("") if not using webhooks.
+webhook_url = ""
+
+
+# ------------------------------------------------------------------------------
+# TOKEN HEALTH VALIDATOR (BACKGROUND MONITOR)
+# ------------------------------------------------------------------------------
+[token_validator]
+# ENABLE PERIODIC BACKGROUND TOKEN HEALTH CHECK
+# Periodically tests your token against Discord API to ensure the selfbot token is active.
+enabled = true
+
+# CHECK INTERVAL (IN HOURS)
+# Default: 2.0 (checks token health every 2 hours)
+interval_hours = 2.0
+[telemetry]
+enabled = true

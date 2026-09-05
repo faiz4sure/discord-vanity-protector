@@ -1,0 +1,9 @@
+/target
+**/*.rs.bk
+*.orig
+.env
+.DS_Store
+*.lock
+package-lock.json
+node_modules/
+my-docs/

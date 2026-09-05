@@ -1,0 +1,13 @@
+{
+  "name": "dvp",
+  "version": "0.1.0",
+  "description": "Ultra-fast Discord Vanity Protection Engine",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "bun": "bun bun.ts"
+  },
+  "dependencies": {
+    "koffi": "^2.9.0"
+  }
+}

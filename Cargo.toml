@@ -1,0 +1,32 @@
+[package]
+name = "dvp"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "dvp"
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+wreq = { version = "0.16.1", features = ["ws", "json", "brotli", "gzip", "zstd", "cookies"] }
+wreq-util = "0.2.0"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+futures-util = "0.3"
+regex = "1"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+toml = "0.8"
+mimalloc = { version = "0.1.52", default-features = false }
+rand = "0.8"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
