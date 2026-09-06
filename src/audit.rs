@@ -60,7 +60,7 @@ pub async fn fetch_latest_guild_update_executor(
                     c.key == "vanity_url_code" || c.key == "vanity_url" || c.key == "vanityURLCode"
                 })
             })
-            .unwrap_or(true);
+            .unwrap_or(false);
 
         if let Some(user_id) = entry.user_id.filter(|_| has_vanity_change) {
             debug!("resolved vanity update executor from audit logs: {user_id}");

@@ -127,16 +127,16 @@ pub async fn send_attack_alert(webhook_url: &str, notification: AttackNotificati
 
     debug!("dispatching background webhook alert to discord");
 
-    // standalone client without discord client origin or authorization headers
-    let client = match wreq::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            debug!("failed to build webhook client: {e}");
-            return;
-        }
+    static CLIENT: std::sync::LazyLock<Option<wreq::Client>> = std::sync::LazyLock::new(|| {
+        wreq::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .ok()
+    });
+
+    let client = match CLIENT.as_ref() {
+        Some(c) => c,
+        None => return,
     };
 
     let resp = match client

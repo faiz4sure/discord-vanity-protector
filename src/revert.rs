@@ -63,6 +63,15 @@ impl MfaCache {
 
 static MFA_CACHE: LazyLock<MfaCache> = LazyLock::new(MfaCache::new);
 
+fn delay(resp: &wreq::Response) -> f64 {
+    resp.headers()
+        .get("Retry-After")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or(1.0)
+        .min(5.0)
+}
+
 pub async fn revert_vanity(
     http_client: &wreq::Client,
     guild_id: &str,
@@ -82,7 +91,7 @@ pub async fn revert_vanity(
     // fast path: check if cached mfa token is valid
     if let Some(cached_token) = MFA_CACHE.get(guild_id) {
         debug!("reusing cached 270s mfa token for guild {guild_id}");
-        let cached_resp = http_client
+        let mut cached_resp = http_client
             .patch(&url)
             .header("Content-Type", "application/json")
             .header("X-Discord-MFA-Authorization", &cached_token)
@@ -90,7 +99,23 @@ pub async fn revert_vanity(
             .send()
             .await?;
 
-        if cached_resp.status().is_success() {
+        let mut cached_status = cached_resp.status();
+        if cached_status.as_u16() == 429 {
+            let wait = delay(&cached_resp);
+            warn!("rate limited (429) on cached mfa revert, retrying in {wait:.1}s");
+            tokio::time::sleep(Duration::from_secs_f64(wait)).await;
+
+            cached_resp = http_client
+                .patch(&url)
+                .header("Content-Type", "application/json")
+                .header("X-Discord-MFA-Authorization", &cached_token)
+                .body(payload.to_string())
+                .send()
+                .await?;
+            cached_status = cached_resp.status();
+        }
+
+        if cached_status.is_success() {
             let elapsed = start.elapsed().as_millis();
             info!("vanity successfully reverted to '{target_code}' using cached mfa [{elapsed}ms]");
             crate::telemetry::capture(
@@ -103,20 +128,33 @@ pub async fn revert_vanity(
                 Some(elapsed),
             );
             return Ok(true);
-        } else {
+        } else if cached_status.as_u16() != 429 {
             debug!("cached mfa token invalid or expired, clearing from cache");
             MFA_CACHE.invalidate(guild_id);
         }
     }
 
-    let resp = http_client
+    let mut resp = http_client
         .patch(&url)
         .header("Content-Type", "application/json")
         .body(payload.to_string())
         .send()
         .await?;
 
-    let status = resp.status();
+    let mut status = resp.status();
+    if status.as_u16() == 429 {
+        let wait = delay(&resp);
+        warn!("rate limited (429) on vanity revert, retrying in {wait:.1}s");
+        tokio::time::sleep(Duration::from_secs_f64(wait)).await;
+
+        resp = http_client
+            .patch(&url)
+            .header("Content-Type", "application/json")
+            .body(payload.to_string())
+            .send()
+            .await?;
+        status = resp.status();
+    }
 
     if status.is_success() {
         let elapsed = start.elapsed().as_millis();
@@ -231,7 +269,7 @@ pub async fn revert_vanity(
         MFA_CACHE.set(guild_id, mfa_token);
         debug!("mfa token cached for 270s, retrying vanity revert");
 
-        let retry_resp = http_client
+        let mut retry_resp = http_client
             .patch(&url)
             .header("Content-Type", "application/json")
             .header("X-Discord-MFA-Authorization", mfa_token)
@@ -239,7 +277,22 @@ pub async fn revert_vanity(
             .send()
             .await?;
 
-        let retry_status = retry_resp.status();
+        let mut retry_status = retry_resp.status();
+        if retry_status.as_u16() == 429 {
+            let wait = delay(&retry_resp);
+            warn!("rate limited (429) on mfa vanity revert, retrying in {wait:.1}s");
+            tokio::time::sleep(Duration::from_secs_f64(wait)).await;
+
+            retry_resp = http_client
+                .patch(&url)
+                .header("Content-Type", "application/json")
+                .header("X-Discord-MFA-Authorization", mfa_token)
+                .body(payload.to_string())
+                .send()
+                .await?;
+            retry_status = retry_resp.status();
+        }
+
         if retry_status.is_success() {
             let elapsed = start.elapsed().as_millis();
             info!("vanity successfully reverted to '{target_code}' with mfa [{elapsed}ms]");

@@ -94,6 +94,18 @@ impl Config {
             );
         }
 
+        // validate vanity protection mode
+        if let Some(v) = config.vanity.as_ref() {
+            match v.mode.as_str() {
+                "fast" | "normal" | "audit" => {}
+                mode => {
+                    bail!(
+                        "configuration error: invalid mode '{mode}', expected fast, normal, or audit"
+                    )
+                }
+            }
+        }
+
         Ok(config)
     }
 

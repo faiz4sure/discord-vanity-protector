@@ -5,6 +5,7 @@ pub mod audit;
 pub mod build;
 pub mod client;
 pub mod config;
+pub mod event;
 pub mod ffi;
 pub mod gateway;
 pub mod identity;
