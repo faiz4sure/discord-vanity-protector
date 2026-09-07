@@ -31,6 +31,10 @@ pub fn create_http_client(identity: &DesktopIdentity, token: Option<&str>) -> Re
     );
     headers.insert("User-Agent", HeaderValue::from_str(&identity.user_agent)?);
     headers.insert("Origin", HeaderValue::from_static("https://discord.com"));
+    headers.insert(
+        "Referer",
+        HeaderValue::from_static("https://discord.com/channels/@me"),
+    );
     headers.insert("Accept", HeaderValue::from_static("*/*"));
     headers.insert(
         "Accept-Language",
@@ -39,6 +43,12 @@ pub fn create_http_client(identity: &DesktopIdentity, token: Option<&str>) -> Re
     headers.insert(
         "Accept-Encoding",
         HeaderValue::from_static("gzip, deflate, br, zstd"),
+    );
+    headers.insert("Sec-CH-UA", HeaderValue::from_str(&identity.sec_ch_ua)?);
+    headers.insert("Sec-CH-UA-Mobile", HeaderValue::from_static("?0"));
+    headers.insert(
+        "Sec-CH-UA-Platform",
+        HeaderValue::from_static("\"Windows\""),
     );
     headers.insert("Sec-Fetch-Dest", HeaderValue::from_static("empty"));
     headers.insert("Sec-Fetch-Mode", HeaderValue::from_static("cors"));
@@ -54,9 +64,13 @@ pub fn create_http_client(identity: &DesktopIdentity, token: Option<&str>) -> Re
     orig_headers.insert("X-Super-Properties");
     orig_headers.insert("User-Agent");
     orig_headers.insert("Origin");
+    orig_headers.insert("Referer");
     orig_headers.insert("Accept");
     orig_headers.insert("Accept-Language");
     orig_headers.insert("Accept-Encoding");
+    orig_headers.insert("Sec-CH-UA");
+    orig_headers.insert("Sec-CH-UA-Mobile");
+    orig_headers.insert("Sec-CH-UA-Platform");
     orig_headers.insert("Sec-Fetch-Dest");
     orig_headers.insert("Sec-Fetch-Mode");
     orig_headers.insert("Sec-Fetch-Site");
@@ -113,9 +127,10 @@ pub fn create_ws_client(identity: &DesktopIdentity) -> Result<Client> {
         .build();
 
     let mut headers = HeaderMap::new();
-    headers.insert("Origin", HeaderValue::from_static("https://discord.com"));
+    headers.insert("Pragma", HeaderValue::from_static("no-cache"));
+    headers.insert("Cache-Control", HeaderValue::from_static("no-cache"));
     headers.insert("User-Agent", HeaderValue::from_str(&identity.user_agent)?);
-    headers.insert("Accept", HeaderValue::from_static("*/*"));
+    headers.insert("Origin", HeaderValue::from_static("https://discord.com"));
     headers.insert(
         "Accept-Language",
         HeaderValue::from_static("en-US,en;q=0.9"),
@@ -130,9 +145,10 @@ pub fn create_ws_client(identity: &DesktopIdentity) -> Result<Client> {
     );
 
     let mut orig_headers = OrigHeaderMap::new();
-    orig_headers.insert("Origin");
+    orig_headers.insert("Pragma");
+    orig_headers.insert("Cache-Control");
     orig_headers.insert("User-Agent");
-    orig_headers.insert("Accept");
+    orig_headers.insert("Origin");
     orig_headers.insert("Accept-Language");
     orig_headers.insert("Accept-Encoding");
     orig_headers.insert("Sec-WebSocket-Extensions");

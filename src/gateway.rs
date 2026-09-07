@@ -311,7 +311,7 @@ async fn run_single_connection(
                                 "op": 40,
                                 "d": {
                                     "qos": {
-                                        "ver": 27,
+                                        "ver": 31,
                                         "active": true,
                                         "reasons": ["foregrounded"]
                                     },
@@ -326,6 +326,51 @@ async fn run_single_connection(
                                 break;
                             }
                             debug!("heartbeat ping sent (seq={seq})");
+                        }
+                    });
+
+                    let time_tx = out_tx.clone();
+                    let time_seq = Arc::clone(&session.last_sequence);
+                    let time_launch = identity.client_launch_id.clone();
+                    let time_init = identity.initialization_timestamp_ms;
+                    let time_hb = identity.client_heartbeat_session_id.clone();
+
+                    tokio::spawn(async move {
+                        let mut interval = tokio::time::interval(Duration::from_secs(1800));
+                        interval.tick().await; // skip initial tick since ready handles it
+                        loop {
+                            interval.tick().await;
+
+                            let ts = json!({
+                                "op": 41,
+                                "d": {
+                                    "initialization_timestamp": time_init,
+                                    "session_id": time_hb,
+                                    "client_launch_id": time_launch
+                                }
+                            });
+
+                            if time_tx.send(Message::text(ts.to_string())).is_err() {
+                                break;
+                            }
+
+                            let seq = time_seq.load(Ordering::Relaxed);
+                            let seq_val = if seq >= 0 { json!(seq) } else { Value::Null };
+                            let qos = json!({
+                                "op": 40,
+                                "d": {
+                                    "qos": {
+                                        "ver": 31,
+                                        "active": true,
+                                        "reasons": ["foregrounded"]
+                                    },
+                                    "seq": seq_val
+                                }
+                            });
+
+                            if time_tx.send(Message::text(qos.to_string())).is_err() {
+                                break;
+                            }
                         }
                     });
                 }
@@ -365,7 +410,8 @@ async fn run_single_connection(
                         },
                         "compress": false,
                         "client_state": {
-                            "guild_versions": {}
+                            "guild_versions": {},
+                            "api_code_version": 0
                         }
                     }
                 });
@@ -424,6 +470,45 @@ async fn run_single_connection(
                         info!(
                             "if you encounter any issues or unexpected errors, please report them to our support server: https://discord.gg/nreK8UQwHW (actively maintained)"
                         );
+
+                        // dispatch opcode 41 (update time spent session id)
+                        let ts_payload = json!({
+                            "op": 41,
+                            "d": {
+                                "initialization_timestamp": identity.initialization_timestamp_ms,
+                                "session_id": identity.client_heartbeat_session_id,
+                                "client_launch_id": identity.client_launch_id
+                            }
+                        });
+                        let _ = out_tx.send(Message::text(ts_payload.to_string()));
+
+                        let seq = session.last_sequence.load(Ordering::Relaxed);
+                        let seq_val = if seq >= 0 { json!(seq) } else { Value::Null };
+                        let initial_hb = json!({
+                            "op": 40,
+                            "d": {
+                                "qos": {
+                                    "ver": 31,
+                                    "active": true,
+                                    "reasons": ["foregrounded"]
+                                },
+                                "seq": seq_val
+                            }
+                        });
+                        let _ = out_tx.send(Message::text(initial_hb.to_string()));
+
+                        // dispatch initial idle voice state
+                        let voice_idle = json!({
+                            "op": 4,
+                            "d": {
+                                "guild_id": Value::Null,
+                                "channel_id": Value::Null,
+                                "self_mute": false,
+                                "self_deaf": false,
+                                "self_video": false
+                            }
+                        });
+                        let _ = out_tx.send(Message::text(voice_idle.to_string()));
                     }
                     "RESUMED" => {
                         session.resume_fail_count.store(0, Ordering::Relaxed);

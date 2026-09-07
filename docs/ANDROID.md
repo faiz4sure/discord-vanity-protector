@@ -43,51 +43,26 @@ Populate the required fields:
 
 ## 2. Execution Pathways
 
-You can run DVP on Android via two distinct methods:
+Android (Termux) operates on Android's **Bionic C library** and LLVM `libc++` rather than standard GNU `glibc` / `libstdc++.so.6`. Choose the pathway best suited for your setup:
 
 ---
 
-### Pathway A: Zero-Compilation Execution (Python, Bun, or Node.js)
+### Pathway A: Native Compilation inside Termux (Recommended)
 
-DVP provides lightweight FFI runtime loaders (`main.py`, `bun.ts`, `index.js`) that automatically detect the `aarch64` architecture, fetch the pre-compiled `libdvp-linux-aarch64.so` binary from GitHub Releases, and execute the engine directly in background memory.
+Building directly on your device links the engine against Android's native Bionic runtime and `libc++`, guaranteeing 100% native stability without missing library dependencies.
 
-#### Option 1: Python Loader (Recommended for Android)
-Install Python and run:
+> [!IMPORTANT]
+> **Compilation Resource Notice**: Compiling DVP from source (especially BoringSSL C/C++ crypto components and Fat LTO optimizations) is CPU- and memory-intensive on mobile hardware and can take **5 to 15+ minutes** depending on your phone's processor.
+>
+> **Before starting compilation**, execute `termux-wake-lock` to keep the CPU awake and prevent Android from killing the compiler process in the background.
 
+#### 1. Acquire Wake Lock & Install Build Tools
 ```bash
-pkg install -y python
-python3 main.py
-```
+# Keep CPU awake during long compilation
+termux-wake-lock
 
-#### Option 2: Bun Loader
-Install Bun inside Termux and run:
-
-```bash
-curl -fsSL https://bun.sh/install | bash
-source ~/.bashrc
-bun run bun.ts
-```
-
-#### Option 3: Node.js Loader
-Install Node.js, install runtime dependencies, and run:
-
-```bash
-pkg install -y nodejs
-npm install
-node index.js
-```
-
----
-
-### Pathway B: Native Compilation inside Termux
-
-If you prefer compiling the engine directly on your Android device:
-
-#### 1. Configure Rust & Toolchain Environment
-```bash
-pkg install -y rust clang binutils
-export CC=clang
-export CXX=clang++
+# Install required toolchains
+pkg install -y rust clang make cmake binutils openssl
 ```
 
 #### 2. Build Release Artifacts
@@ -95,13 +70,38 @@ export CXX=clang++
 cargo build --release
 ```
 
-Compilation produces:
+Compilation generates:
 - `target/release/dvp` (Standalone native executable)
 - `target/release/libdvp.so` (Dynamic shared library)
 
-#### 3. Run Native Executable
+#### 3. Run Native Engine
 ```bash
+# Direct binary execution:
 ./target/release/dvp
+
+# Or via Python loader (loads local target/release/libdvp.so):
+python3 main.py
+```
+
+---
+
+### Pathway B: Zero-Compilation Prebuilt via PRoot Linux (Ubuntu)
+
+The pre-compiled `libdvp-linux-aarch64.so` binaries in GitHub Releases target standard GNU Linux (`glibc` & `libstdc++.so.6`). To run these pre-compiled binaries on Android without compiling:
+
+#### 1. Install PRoot Ubuntu Container
+```bash
+pkg install -y proot-distro
+proot-distro install ubuntu
+proot-distro login ubuntu
+```
+
+#### 2. Run Pre-Compiled Loaders inside PRoot
+```bash
+apt update && apt install -y python3 libstdc++6 git curl
+git clone https://github.com/faiz4sure/discord-vanity-protector.git dvp
+cd dvp
+python3 main.py
 ```
 
 ---

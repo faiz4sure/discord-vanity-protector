@@ -9,16 +9,27 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub struct DesktopIdentity {
     pub user_agent: String,
+    pub sec_ch_ua: String,
     #[allow(dead_code)]
     pub super_properties: Value,
     pub encoded_super_properties: String,
     pub gateway_properties: Value,
+    pub client_launch_id: String,
+    pub client_heartbeat_session_id: String,
+    pub initialization_timestamp_ms: u64,
 }
 
 pub fn create_desktop_identity(build: &DesktopBuild) -> DesktopIdentity {
     let client_launch_id = Uuid::new_v4().to_string();
     let client_heartbeat_session_id = Uuid::new_v4().to_string();
     let launch_signature = generate_launch_signature();
+    let initialization_timestamp_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    let major_chrome = build.chrome_version.split('.').next().unwrap_or("148");
+    let sec_ch_ua = format!("\"Chromium\";v=\"{major_chrome}\", \"Not=A?Brand\";v=\"24\"");
 
     let user_agent = format!(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) discord/{} Chrome/{} Electron/{} Safari/537.36",
@@ -58,9 +69,13 @@ pub fn create_desktop_identity(build: &DesktopBuild) -> DesktopIdentity {
 
     DesktopIdentity {
         user_agent,
+        sec_ch_ua,
         super_properties,
         encoded_super_properties,
         gateway_properties,
+        client_launch_id,
+        client_heartbeat_session_id,
+        initialization_timestamp_ms,
     }
 }
 

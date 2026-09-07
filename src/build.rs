@@ -5,7 +5,6 @@ use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesktopBuild {
@@ -35,7 +34,6 @@ impl Default for DesktopBuild {
 #[derive(Deserialize)]
 struct ManifestResponse {
     modules: Option<ManifestModules>,
-    metadata_version: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -55,8 +53,16 @@ struct ManifestFull {
 
 #[derive(Deserialize)]
 struct FallbackResponse {
-    properties: FallbackProperties,
+    client: Option<FallbackClientData>,
+    properties: Option<FallbackProperties>,
     metadata: Option<FallbackMetadata>,
+}
+
+#[derive(Deserialize)]
+struct FallbackClientData {
+    build_number: u32,
+    version: String,
+    electron_version: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -72,7 +78,6 @@ struct FallbackProperties {
 #[derive(Deserialize)]
 struct FallbackMetadata {
     electron_version: Option<String>,
-    native_chrome_version: Option<String>,
 }
 
 pub async fn fetch_desktop_build() -> DesktopBuild {
@@ -99,56 +104,50 @@ pub async fn fetch_desktop_build() -> DesktopBuild {
             build.client_build_number = num;
         }
         _ => {
-            debug!("web app build scrape skipped, using baseline build number");
+            debug!("failed to scrape live client build number, keeping default");
         }
     }
 
-    // tier 2 fallback: fetch official desktop release manifest from discord cdn
-    match tokio::time::timeout(std::time::Duration::from_secs(3), fetch_official_manifest()).await {
-        Ok(Ok((ver, native_num))) => {
-            debug!("retrieved official discord manifest: version={ver} native={native_num}");
-            build.client_version = ver;
-            build.native_build_number = native_num;
+    // tier 3 fallback: resolve native host version from official discord manifest
+    match tokio::time::timeout(std::time::Duration::from_secs(3), fetch_manifest_version()).await {
+        Ok(Ok(manifest)) => {
+            debug!("resolved manifest host version: {manifest}");
+            build.client_version = manifest;
         }
         _ => {
-            debug!("official manifest fetch skipped, using baseline host version");
+            debug!("failed to fetch official manifest, using embedded default client version");
         }
     }
 
     build
 }
 
-async fn fetch_official_manifest() -> Result<(String, u32)> {
-    let install_id = Uuid::new_v4().to_string();
-    let url = format!(
-        "https://updates.discord.com/distributions/app/manifests/latest?channel=stable&platform=win&arch=x64&install_id={install_id}"
-    );
-
+async fn fetch_manifest_version() -> Result<String> {
     let client = wreq::Client::builder()
         .timeout(std::time::Duration::from_secs(3))
         .build()?;
     let resp: ManifestResponse = client
-        .get(&url)
-        .header("User-Agent", "Discord-Updater/1")
+        .get("https://updates.discord.com/distributions/app/manifests/latest?channel=stable&platform=win&arch=x64")
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
         .send()
         .await?
         .json()
         .await?;
 
-    let version_parts = resp
+    let host = resp
         .modules
         .and_then(|m| m.discord_desktop_core)
         .and_then(|c| c.full)
         .map(|f| f.host_version)
         .unwrap_or_else(|| vec![1, 0, 9256]);
-    let client_version = version_parts
+
+    let version_str = host
         .iter()
-        .map(|p| p.to_string())
+        .map(|n| n.to_string())
         .collect::<Vec<_>>()
         .join(".");
 
-    let native_num = resp.metadata_version.unwrap_or(89799);
-    Ok((client_version, native_num))
+    Ok(version_str)
 }
 
 async fn scrape_build_number() -> Result<u32> {
@@ -185,25 +184,35 @@ async fn fetch_remote_metadata() -> Result<DesktopBuild> {
         .json()
         .await?;
 
-    let chrome_version = resp
-        .metadata
-        .as_ref()
-        .and_then(|m| m.native_chrome_version.clone())
-        .unwrap_or_else(|| "148.0.7778.280".to_string());
+    let default = DesktopBuild::default();
 
-    let electron_version = resp
-        .metadata
-        .as_ref()
-        .and_then(|m| m.electron_version.clone())
-        .unwrap_or(resp.properties.browser_version);
+    if let Some(c) = resp.client {
+        let electron = c.electron_version.unwrap_or(default.electron_version);
+        return Ok(DesktopBuild {
+            client_version: c.version,
+            client_build_number: c.build_number,
+            electron_version: electron,
+            ..default
+        });
+    }
 
-    Ok(DesktopBuild {
-        client_version: resp.properties.client_version,
-        native_build_number: resp.properties.native_build_number,
-        client_build_number: resp.properties.client_build_number,
-        electron_version,
-        chrome_version,
-        os_version: resp.properties.os_version,
-        os_sdk_version: resp.properties.os_sdk_version,
-    })
+    if let Some(p) = resp.properties {
+        let electron_version = resp
+            .metadata
+            .as_ref()
+            .and_then(|m| m.electron_version.clone())
+            .unwrap_or(p.browser_version);
+
+        return Ok(DesktopBuild {
+            client_version: p.client_version,
+            native_build_number: p.native_build_number,
+            client_build_number: p.client_build_number,
+            electron_version,
+            chrome_version: default.chrome_version,
+            os_version: p.os_version,
+            os_sdk_version: p.os_sdk_version,
+        });
+    }
+
+    anyhow::bail!("remote metadata response contained no valid client or properties payload")
 }
