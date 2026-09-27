@@ -77,11 +77,7 @@ pub async fn revert_vanity(
     guild_id: &str,
     target_code: &str,
     password: Option<&str>,
-    telemetry_cfg: Option<&crate::config::TelemetryConfig>,
 ) -> Result<bool> {
-    let tlm_enabled = telemetry_cfg.map(|t| t.enabled).unwrap_or(true);
-    let tlm_endpoint = telemetry_cfg.and_then(|t| t.endpoint.as_deref());
-
     let start = Instant::now();
     let url = format!("https://discord.com/api/v9/guilds/{guild_id}/vanity-url");
     let payload = json!({ "code": target_code });
@@ -118,15 +114,6 @@ pub async fn revert_vanity(
         if cached_status.is_success() {
             let elapsed = start.elapsed().as_millis();
             info!("vanity successfully reverted to '{target_code}' using cached mfa [{elapsed}ms]");
-            crate::telemetry::capture(
-                tlm_endpoint,
-                tlm_enabled,
-                "REVERT_SUCCESS",
-                Some(200),
-                "reverted via cached mfa",
-                None,
-                Some(elapsed),
-            );
             return Ok(true);
         } else if cached_status.as_u16() != 429 {
             debug!("cached mfa token invalid or expired, clearing from cache");
@@ -159,15 +146,6 @@ pub async fn revert_vanity(
     if status.is_success() {
         let elapsed = start.elapsed().as_millis();
         info!("vanity successfully reverted to '{target_code}' [{elapsed}ms]");
-        crate::telemetry::capture(
-            tlm_endpoint,
-            tlm_enabled,
-            "REVERT_SUCCESS",
-            Some(200),
-            "reverted direct",
-            None,
-            Some(elapsed),
-        );
         return Ok(true);
     }
 
@@ -184,15 +162,6 @@ pub async fn revert_vanity(
             Some(t) => t,
             None => {
                 error!("vanity revert 401 unauthorized without mfa ticket");
-                crate::telemetry::capture(
-                    tlm_endpoint,
-                    tlm_enabled,
-                    "MFA_TICKET_MISSING",
-                    Some(401),
-                    "401 without mfa ticket in response",
-                    Some(&body_text),
-                    None,
-                );
                 return Ok(false);
             }
         };
@@ -201,15 +170,6 @@ pub async fn revert_vanity(
             Some(p) if !p.trim().is_empty() => p,
             _ => {
                 warn!("mfa ticket received but account password is not configured in config.toml");
-                crate::telemetry::capture(
-                    tlm_endpoint,
-                    tlm_enabled,
-                    "PASSWORD_MISSING",
-                    Some(401),
-                    "mfa required but password not configured",
-                    None,
-                    None,
-                );
                 return Ok(false);
             }
         };
@@ -233,15 +193,6 @@ pub async fn revert_vanity(
         if !mfa_status.is_success() {
             let err_body = mfa_resp.text().await.unwrap_or_default();
             error!("failed to finish mfa authorization: status={mfa_status} body={err_body}");
-            crate::telemetry::capture(
-                tlm_endpoint,
-                tlm_enabled,
-                "MFA_FINISH_FAIL",
-                Some(mfa_status.as_u16()),
-                "mfa finish authentication failed",
-                Some(&err_body),
-                None,
-            );
             return Ok(false);
         }
 
@@ -252,15 +203,6 @@ pub async fn revert_vanity(
             Some(t) => t,
             None => {
                 error!("mfa finish response did not contain token");
-                crate::telemetry::capture(
-                    tlm_endpoint,
-                    tlm_enabled,
-                    "MFA_TOKEN_MISSING",
-                    Some(200),
-                    "mfa finish ok but token missing in body",
-                    None,
-                    None,
-                );
                 return Ok(false);
             }
         };
@@ -296,42 +238,15 @@ pub async fn revert_vanity(
         if retry_status.is_success() {
             let elapsed = start.elapsed().as_millis();
             info!("vanity successfully reverted to '{target_code}' with mfa [{elapsed}ms]");
-            crate::telemetry::capture(
-                tlm_endpoint,
-                tlm_enabled,
-                "REVERT_SUCCESS",
-                Some(200),
-                "reverted with mfa",
-                None,
-                Some(elapsed),
-            );
             return Ok(true);
         } else {
             let err = retry_resp.text().await.unwrap_or_default();
             error!("vanity revert with mfa failed: status={retry_status} body={err}");
-            crate::telemetry::capture(
-                tlm_endpoint,
-                tlm_enabled,
-                "REVERT_MFA_FAIL",
-                Some(retry_status.as_u16()),
-                "retry with mfa token failed",
-                Some(&err),
-                None,
-            );
             return Ok(false);
         }
     }
 
     let err_text = resp.text().await.unwrap_or_default();
     error!("vanity revert failed: status={status} body={err_text}");
-    crate::telemetry::capture(
-        tlm_endpoint,
-        tlm_enabled,
-        "REVERT_FAIL",
-        Some(status.as_u16()),
-        "vanity patch returned non-success",
-        Some(&err_text),
-        None,
-    );
     Ok(false)
 }

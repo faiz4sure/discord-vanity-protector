@@ -186,7 +186,7 @@ graph TD
 - **Resolution Tiers**:
   1. **Tier 1 (Remote Provider)**: Queries remote endpoint `https://cordapi.dolfi.es/api/v2/properties/windows` with a 3-second timeout for synchronized client versions, Electron versions, and Chrome build numbers.
   2. **Tier 2 (Official Web Scrape Fallback)**: Scrapes `https://discord.com/login` using regular expression `r#""BUILD_NUMBER":\s*"(\d+)""#` and queries the official update CDN `https://updates.discord.com/distributions/app/manifests/latest?channel=stable&platform=win&arch=x64` for host module version strings.
-  3. **Tier 3 (Baseline Default)**: Falls back to compile-time default constants (`client_version: "1.0.9256"`, `native_build_number: 89799`, `client_build_number: 607562`, `electron_version: "42.9.0"`, `chrome_version: "148.0.7778.280"`).
+  3. **Tier 3 (Baseline Default)**: Falls back to compile-time default constants (`client_version: "1.0.9259"`, `native_build_number: 91497`, `client_build_number: 621195`, `electron_version: "42.11.4"`, `chrome_version: "148.0.7778.280"`).
 
 ---
 
@@ -195,8 +195,10 @@ Constructs the serialized JSON super-properties header and gateway handshake pay
 
 - **Launch Signature Masking (`generate_launch_signature`)**:
   Clears 12 mod-detection bit positions across a 128-bit UUID integer to eliminate client-modification flags:
-  $$\text{mod\_bits} = 2^{119} \mid 2^{108} \mid 2^{100} \mid 2^{91} \mid 2^{84} \mid 2^{75} \mid 2^{61} \mid 2^{55} \mid 2^{48} \mid 2^{38} \mid 2^{24} \mid 2^{11}$$
-  $$\text{clean\_signature} = \text{random\_uuid}_{128} \ \& \ \sim\text{mod\_bits}$$
+  ```text
+  mod_bits = 2^119 | 2^108 | 2^100 | 2^91 | 2^84 | 2^75 | 2^61 | 2^55 | 2^48 | 2^38 | 2^24 | 2^11
+  clean_signature = random_uuid_128 & ~mod_bits
+  ```
 - **Encoding**: Serializes super-properties into standard Base64 for the `X-Super-Properties` HTTP header.
 - **Gateway Properties**: Injects `"is_fast_connect": false` and `"gateway_connect_reasons": "AppSkeleton"`.
 
@@ -224,7 +226,7 @@ Manages the real-time Discord Gateway connection over WebSocket:
 - **Ingestion Buffer**: 15 MB read buffer (`read_buffer_size(15 * 1024 * 1024)`).
 - **Opcode Lifecycle**:
   - **Opcode 10 `HELLO`**: Reads `heartbeat_interval` (default 41,250 ms), spawns background jittered heartbeat loop.
-  - **Opcode 40 QoS Heartbeat**: Sends foregrounded QoS pings (`"ver": 27`, `"reasons": ["foregrounded"]`, sequence number).
+  - **Opcode 40 QoS Heartbeat**: Sends foregrounded QoS pings (`"ver": 31`, `"reasons": ["foregrounded"]`, sequence number).
   - **Opcode 1 Heartbeat**: Responds immediately with current sequence number when requested by Discord.
   - **Opcode 2 `IDENTIFY`**: Dispatches full identity payload with capabilities bitmask `1734653`.
   - **Opcode 6 `RESUME`**: Dispatches session resumption when `session_id` and sequence number are present.

@@ -95,5 +95,3 @@ enabled = true
 # CHECK INTERVAL (IN HOURS)
 # Default: 2.0 (checks token health every 2 hours)
 interval_hours = 2.0
-[telemetry]
-enabled = true

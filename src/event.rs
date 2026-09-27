@@ -77,15 +77,9 @@ pub async fn update(
             let pwd = config.vanity.as_ref().and_then(|v| v.password.clone());
 
             tokio::spawn(async move {
-                let ok = revert::revert_vanity(
-                    &client,
-                    &g_id,
-                    &v_code,
-                    pwd.as_deref(),
-                    cfg.telemetry.as_ref(),
-                )
-                .await
-                .unwrap_or(false);
+                let ok = revert::revert_vanity(&client, &g_id, &v_code, pwd.as_deref())
+                    .await
+                    .unwrap_or(false);
 
                 let total = start.elapsed().as_millis();
                 alert(
@@ -254,15 +248,10 @@ async fn act(client: &wreq::Client, cfg: &Config, ctx: Context, self_id: &str) {
     let exec = match ctx.executor {
         Some(ref id) if !id.is_empty() => id.as_str(),
         _ => {
-            let rev_ok = revert::revert_vanity(
-                client,
-                &ctx.guild_id,
-                &ctx.target_vanity,
-                pwd.as_deref(),
-                cfg.telemetry.as_ref(),
-            )
-            .await
-            .unwrap_or(false);
+            let rev_ok =
+                revert::revert_vanity(client, &ctx.guild_id, &ctx.target_vanity, pwd.as_deref())
+                    .await
+                    .unwrap_or(false);
 
             let total = ctx.start.elapsed().as_millis();
             alert(
@@ -296,15 +285,10 @@ async fn act(client: &wreq::Client, cfg: &Config, ctx: Context, self_id: &str) {
 
     if cfg.is_whitelisted(exec) {
         warn!("vanity changed by whitelisted user {exec}, reverting without punishment");
-        let rev_ok = revert::revert_vanity(
-            client,
-            &ctx.guild_id,
-            &ctx.target_vanity,
-            pwd.as_deref(),
-            cfg.telemetry.as_ref(),
-        )
-        .await
-        .unwrap_or(false);
+        let rev_ok =
+            revert::revert_vanity(client, &ctx.guild_id, &ctx.target_vanity, pwd.as_deref())
+                .await
+                .unwrap_or(false);
 
         let total = ctx.start.elapsed().as_millis();
         alert(
@@ -334,13 +318,7 @@ async fn act(client: &wreq::Client, cfg: &Config, ctx: Context, self_id: &str) {
         .unwrap_or("ban");
 
     let (rev_res, pun_res) = tokio::join!(
-        revert::revert_vanity(
-            client,
-            &ctx.guild_id,
-            &ctx.target_vanity,
-            pwd.as_deref(),
-            cfg.telemetry.as_ref(),
-        ),
+        revert::revert_vanity(client, &ctx.guild_id, &ctx.target_vanity, pwd.as_deref(),),
         punish::punish_executor(
             client,
             &ctx.guild_id,

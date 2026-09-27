@@ -12,5 +12,4 @@ pub mod identity;
 pub mod notify;
 pub mod punish;
 pub mod revert;
-pub mod telemetry;
 pub mod validator;

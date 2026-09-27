@@ -20,13 +20,13 @@ pub struct DesktopBuild {
 impl Default for DesktopBuild {
     fn default() -> Self {
         Self {
-            client_version: "1.0.9256".to_string(),
-            native_build_number: 89799,
-            client_build_number: 607562,
-            electron_version: "42.9.0".to_string(),
+            client_version: "1.0.9259".to_string(),
+            native_build_number: 91497,
+            client_build_number: 621195,
+            electron_version: "42.11.4".to_string(),
             chrome_version: "148.0.7778.280".to_string(),
-            os_version: "10.0.26100".to_string(),
-            os_sdk_version: "26100".to_string(),
+            os_version: "10.0.26200".to_string(),
+            os_sdk_version: "26200".to_string(),
         }
     }
 }
@@ -55,14 +55,12 @@ struct ManifestFull {
 struct FallbackResponse {
     client: Option<FallbackClientData>,
     properties: Option<FallbackProperties>,
-    metadata: Option<FallbackMetadata>,
 }
 
 #[derive(Deserialize)]
 struct FallbackClientData {
     build_number: u32,
     version: String,
-    electron_version: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -70,14 +68,8 @@ struct FallbackProperties {
     client_version: String,
     native_build_number: u32,
     client_build_number: u32,
-    browser_version: String,
     os_version: String,
     os_sdk_version: String,
-}
-
-#[derive(Deserialize)]
-struct FallbackMetadata {
-    electron_version: Option<String>,
 }
 
 pub async fn fetch_desktop_build() -> DesktopBuild {
@@ -139,7 +131,7 @@ async fn fetch_manifest_version() -> Result<String> {
         .and_then(|m| m.discord_desktop_core)
         .and_then(|c| c.full)
         .map(|f| f.host_version)
-        .unwrap_or_else(|| vec![1, 0, 9256]);
+        .unwrap_or_else(|| vec![1, 0, 9259]);
 
     let version_str = host
         .iter()
@@ -187,27 +179,21 @@ async fn fetch_remote_metadata() -> Result<DesktopBuild> {
     let default = DesktopBuild::default();
 
     if let Some(c) = resp.client {
-        let electron = c.electron_version.unwrap_or(default.electron_version);
         return Ok(DesktopBuild {
             client_version: c.version,
             client_build_number: c.build_number,
-            electron_version: electron,
+            electron_version: default.electron_version,
+            chrome_version: default.chrome_version,
             ..default
         });
     }
 
     if let Some(p) = resp.properties {
-        let electron_version = resp
-            .metadata
-            .as_ref()
-            .and_then(|m| m.electron_version.clone())
-            .unwrap_or(p.browser_version);
-
         return Ok(DesktopBuild {
             client_version: p.client_version,
             native_build_number: p.native_build_number,
             client_build_number: p.client_build_number,
-            electron_version,
+            electron_version: default.electron_version,
             chrome_version: default.chrome_version,
             os_version: p.os_version,
             os_sdk_version: p.os_sdk_version,

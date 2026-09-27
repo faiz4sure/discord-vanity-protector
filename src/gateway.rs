@@ -222,21 +222,6 @@ async fn run_single_connection(
 
                 if let Some(c) = code {
                     if c == 4004 || c == 4014 {
-                        let tlm_enabled =
-                            config.telemetry.as_ref().map(|t| t.enabled).unwrap_or(true);
-                        let tlm_endpoint = config
-                            .telemetry
-                            .as_ref()
-                            .and_then(|t| t.endpoint.as_deref());
-                        crate::telemetry::capture(
-                            tlm_endpoint,
-                            tlm_enabled,
-                            "GATEWAY_FATAL_CLOSE",
-                            Some(c),
-                            reason,
-                            None,
-                            None,
-                        );
                         outcome = ConnectionResult::Fatal(format!(
                             "fatal close code {c} received: {reason}"
                         ));

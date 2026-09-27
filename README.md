@@ -90,6 +90,12 @@ If you need help setting up, encounter unexpected errors, or have questions:
 
 ---
 
+## Disclaimer
+
+This tool is made strictly for vanity protection, not for harmful use. Automating user accounts is against Discord's Terms of Service, so use it at your own risk — the developer is not responsible for any bans or account issues.
+
+---
+
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).

@@ -7,7 +7,7 @@ This document outlines prerequisites, build configurations, dual artifact genera
 ## 1. Prerequisites
 
 ### System Requirements
-- **Rust Toolchain**: Rust 1.80.0+ (stable channel) with `cargo`, `clippy`, and `rustfmt`
+- **Rust Toolchain**: Rust 1.85.0+ (stable channel, Rust 2024 Edition support required; 1.96.0+ recommended / 1.98.0+ latest) with `cargo`, `clippy`, and `rustfmt`
 - **C/C++ Compiler**: GCC 10+ or Clang 14+
 - **Build Utilities**: `make`, `cmake`, `pkg-config`
 - **OpenSSL / BoringSSL Build Dependencies**: `libssl-dev` (Linux Debian/Ubuntu) or `openssl-devel` (Fedora/RHEL)

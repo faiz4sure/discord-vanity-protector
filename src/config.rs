@@ -12,18 +12,6 @@ pub struct Config {
     pub security: Option<SecurityConfig>,
     pub logging: Option<LoggingConfig>,
     pub token_validator: Option<TokenValidatorConfig>,
-    pub telemetry: Option<TelemetryConfig>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct TelemetryConfig {
-    #[serde(default = "default_telemetry_enabled")]
-    pub enabled: bool,
-    pub endpoint: Option<String>,
-}
-
-fn default_telemetry_enabled() -> bool {
-    true
 }
 
 #[derive(Debug, Clone, Deserialize)]

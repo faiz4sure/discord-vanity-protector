@@ -69,28 +69,9 @@ async fn run_engine(config_path: &str) -> anyhow::Result<()> {
         }
     };
 
-    let panic_cfg = Arc::clone(&cfg);
-    std::panic::set_hook(Box::new(move |panic_info| {
+    std::panic::set_hook(Box::new(|panic_info| {
         let err_msg = panic_info.to_string();
         error!("critical unhandled panic intercepted in ffi: {err_msg}");
-        let tlm_enabled = panic_cfg
-            .telemetry
-            .as_ref()
-            .map(|t| t.enabled)
-            .unwrap_or(true);
-        let tlm_endpoint = panic_cfg
-            .telemetry
-            .as_ref()
-            .and_then(|t| t.endpoint.as_deref());
-        crate::telemetry::capture(
-            tlm_endpoint,
-            tlm_enabled,
-            "CRITICAL_PANIC_FFI",
-            None,
-            &err_msg,
-            None,
-            None,
-        );
     }));
 
     let log_level = cfg
