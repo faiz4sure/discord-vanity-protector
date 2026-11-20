@@ -1,6 +1,6 @@
 # Discord Vanity Protector (DVP)
 
-A high-performance Discord vanity URL protector written in Rust. DVP continuously monitors your Discord server in real-time, instantly detects unauthorized vanity URL changes, automatically restores your vanity URL using account password verification, and punishes attackers with zero delay.
+A high-performance Discord vanity URL protector written in Rust. DVP continuously monitors your Discord server in real-time, instantly detects unauthorized vanity URL changes, automatically restores your vanity URL using 2FA TOTP verification (recommended) or account password fallback, and punishes attackers with zero delay.
 
 DVP appears as an official Discord Windows Desktop client with full TLS emulation, preventing bot detection.
 
@@ -9,7 +9,7 @@ DVP appears as an official Discord Windows Desktop client with full TLS emulatio
 ## Features
 
 - **Instant Vanity Reversion**: Restores your vanity URL in milliseconds when an unauthorized change occurs.
-- **Automated 2FA / Password Verification**: Uses your account password to complete verification on-demand and caches the security token in memory for fast recovery.
+- **Automated 2FA (TOTP) Verification**: Generates 6-digit TOTP codes locally from your 2FA secret key to complete Discord MFA on-demand (recommended) and caches the security token in memory for 270 seconds.
 - **Concurrent Attacker Punishment**: Bans or kicks the attacker at the same instant the vanity is restored.
 - **Zero-Setup Run (No Rust Required)**: You can run DVP directly with Python, Node.js, or Bun — the runner automatically downloads the pre-built engine for your operating system.
 - **Desktop Client Impersonation**: Uses official Discord Windows Desktop headers, build numbers, and BoringSSL TLS fingerprints.
@@ -77,6 +77,7 @@ For deep-dive guides and architecture specifications:
 - [Architecture & Pipeline](docs/ARCHITECTURE.md): Full end-to-end engine flow, Mermaid diagrams, and module breakdown.
 - [Building from Source](docs/BUILD.md): Compiler flags, cross-compilation, and release optimizations.
 - [Android (Termux) Guide](docs/ANDROID.md): Setup and running DVP on Android devices.
+- [Configuring 2FA / TOTP](docs/2FA.md): Recommended setup guide for automatic MFA vanity reversion using a TOTP secret key.
 - [Extracting Discord Token](docs/GET_TOKEN.md): Safe step-by-step tutorial on retrieving your account token.
 
 ---

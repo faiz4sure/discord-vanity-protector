@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (c) 2026 Faiz
 
+use crate::totp::TotpKey;
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use std::fs;
@@ -26,6 +27,9 @@ pub struct VanityConfig {
     #[serde(default = "default_vanity_mode")]
     pub mode: String,
     pub password: Option<String>,
+    pub totp_secret: Option<String>,
+    #[serde(skip)]
+    pub totp_key: Option<TotpKey>,
 }
 
 fn default_vanity_mode() -> String {
@@ -71,10 +75,9 @@ fn default_interval_hours() -> f64 {
 
 impl Config {
     pub fn parse_str(content: &str) -> Result<Self> {
-        let config: Config =
+        let mut config: Config =
             toml::from_str(content).with_context(|| "failed to parse config.toml")?;
 
-        // enforce maximum 2 managers policy
         if let Some(sec) = config.security.as_ref().filter(|s| s.managers.len() > 2) {
             bail!(
                 "configuration error: managers cannot exceed 2 user ids (found {})",
@@ -82,8 +85,7 @@ impl Config {
             );
         }
 
-        // validate vanity protection mode
-        if let Some(v) = config.vanity.as_ref() {
+        if let Some(v) = config.vanity.as_mut() {
             match v.mode.as_str() {
                 "fast" | "normal" | "audit" => {}
                 mode => {
@@ -91,6 +93,18 @@ impl Config {
                         "configuration error: invalid mode '{mode}', expected fast, normal, or audit"
                     )
                 }
+            }
+
+            if let Some(secret) = v
+                .totp_secret
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                v.totp_key = Some(
+                    TotpKey::parse(secret)
+                        .with_context(|| "configuration error: invalid totp_secret")?,
+                );
             }
         }
 

@@ -16,10 +16,9 @@ macro_rules! join {
     };
 }
 
-// client for discord rest http requests using verified chrome 148 profile
 pub fn create_http_client(identity: &DesktopIdentity, token: Option<&str>) -> Result<Client> {
     let emulation = UtilEmulation::builder()
-        .profile(Profile::Chrome148)
+        .profile(Profile::Chrome149)
         .platform(Platform::Windows)
         .headers(false)
         .build();
@@ -76,7 +75,7 @@ pub fn create_http_client(identity: &DesktopIdentity, token: Option<&str>) -> Re
     orig_headers.insert("Sec-Fetch-Site");
     orig_headers.insert("X-Discord-Locale");
     orig_headers.insert("X-Discord-Timezone");
-    if token.is_some() {
+    if token.is_some_and(|t| !t.is_empty()) {
         orig_headers.insert("Authorization");
     }
 

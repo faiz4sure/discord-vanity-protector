@@ -6,7 +6,7 @@ use dvp::config::Config;
 use dvp::{build, client, gateway, identity, validator};
 use mimalloc::MiMalloc;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[global_allocator]
@@ -76,6 +76,22 @@ async fn main() -> Result<()> {
         punishment
     );
 
+    let has_totp = cfg.vanity.as_ref().is_some_and(|v| v.totp_key.is_some());
+    let has_password = cfg
+        .vanity
+        .as_ref()
+        .and_then(|v| v.password.as_deref())
+        .is_some_and(|p| !p.trim().is_empty());
+    if !has_totp && has_password {
+        warn!(
+            "using password for mfa is not recommended (discord may reject it with error 60008); configure totp_secret in [vanity] instead (see docs/2FA.md)"
+        );
+    } else if !has_totp {
+        warn!(
+            "no mfa credentials configured in [vanity]; set totp_secret so vanity reversion can complete mfa (see docs/2FA.md)"
+        );
+    }
+
     info!("fetching discord desktop build metadata");
     let build_info = build::fetch_desktop_build().await;
     info!(
@@ -94,7 +110,7 @@ async fn main() -> Result<()> {
         Some(&cfg.selfbot.token),
     )?);
     let ws_client = client::create_ws_client(&identity)?;
-    info!("clients initialized with chromium 148 / windows profile");
+    info!("clients initialized with chromium 149 / windows profile");
 
     validator::start_token_validator(Arc::clone(&http_client), Arc::clone(&cfg));
 

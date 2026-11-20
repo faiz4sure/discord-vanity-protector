@@ -20,11 +20,11 @@ pub struct DesktopBuild {
 impl Default for DesktopBuild {
     fn default() -> Self {
         Self {
-            client_version: "1.0.9259".to_string(),
-            native_build_number: 91497,
-            client_build_number: 621195,
-            electron_version: "42.11.4".to_string(),
-            chrome_version: "148.0.7778.280".to_string(),
+            client_version: "1.0.9269".to_string(),
+            native_build_number: 98981,
+            client_build_number: 677695,
+            electron_version: "44.10.2".to_string(),
+            chrome_version: "152.0.7977.169".to_string(),
             os_version: "10.0.26200".to_string(),
             os_sdk_version: "26200".to_string(),
         }
@@ -55,6 +55,7 @@ struct ManifestFull {
 struct FallbackResponse {
     client: Option<FallbackClientData>,
     properties: Option<FallbackProperties>,
+    metadata: Option<FallbackMetadata>,
 }
 
 #[derive(Deserialize)]
@@ -65,11 +66,18 @@ struct FallbackClientData {
 
 #[derive(Deserialize)]
 struct FallbackProperties {
-    client_version: String,
-    native_build_number: u32,
-    client_build_number: u32,
-    os_version: String,
-    os_sdk_version: String,
+    client_version: Option<String>,
+    native_build_number: Option<u32>,
+    client_build_number: Option<u32>,
+    browser_version: Option<String>,
+    os_version: Option<String>,
+    os_sdk_version: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct FallbackMetadata {
+    electron_version: Option<String>,
+    native_chrome_version: Option<String>,
 }
 
 pub async fn fetch_desktop_build() -> DesktopBuild {
@@ -131,7 +139,7 @@ async fn fetch_manifest_version() -> Result<String> {
         .and_then(|m| m.discord_desktop_core)
         .and_then(|c| c.full)
         .map(|f| f.host_version)
-        .unwrap_or_else(|| vec![1, 0, 9259]);
+        .unwrap_or_else(|| vec![1, 0, 9269]);
 
     let version_str = host
         .iter()
@@ -189,14 +197,24 @@ async fn fetch_remote_metadata() -> Result<DesktopBuild> {
     }
 
     if let Some(p) = resp.properties {
+        let meta = resp.metadata;
+        let electron_version = meta
+            .as_ref()
+            .and_then(|m| m.electron_version.clone())
+            .or(p.browser_version)
+            .unwrap_or(default.electron_version);
+        let chrome_version = meta
+            .and_then(|m| m.native_chrome_version)
+            .unwrap_or(default.chrome_version);
+
         return Ok(DesktopBuild {
-            client_version: p.client_version,
-            native_build_number: p.native_build_number,
-            client_build_number: p.client_build_number,
-            electron_version: default.electron_version,
-            chrome_version: default.chrome_version,
-            os_version: p.os_version,
-            os_sdk_version: p.os_sdk_version,
+            client_version: p.client_version.unwrap_or(default.client_version),
+            native_build_number: p.native_build_number.unwrap_or(default.native_build_number),
+            client_build_number: p.client_build_number.unwrap_or(default.client_build_number),
+            electron_version,
+            chrome_version,
+            os_version: p.os_version.unwrap_or(default.os_version),
+            os_sdk_version: p.os_sdk_version.unwrap_or(default.os_sdk_version),
         });
     }
 

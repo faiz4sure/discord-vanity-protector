@@ -28,7 +28,7 @@ pub fn create_desktop_identity(build: &DesktopBuild) -> DesktopIdentity {
         .unwrap_or_default()
         .as_millis() as u64;
 
-    let major_chrome = build.chrome_version.split('.').next().unwrap_or("148");
+    let major_chrome = build.chrome_version.split('.').next().unwrap_or("152");
     let sec_ch_ua = format!("\"Chromium\";v=\"{major_chrome}\", \"Not=A?Brand\";v=\"24\"");
 
     let user_agent = format!(

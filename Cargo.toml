@@ -8,8 +8,8 @@ name = "dvp"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-wreq = { version = "0.16.1", features = ["ws", "json", "brotli", "gzip", "zstd", "cookies"] }
-wreq-util = "0.2.0"
+wreq = { version = "0.16.4", features = ["ws", "json", "brotli", "gzip", "zstd", "cookies"] }
+wreq-util = "0.2.1"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

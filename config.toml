@@ -37,12 +37,18 @@ code = ""
 #               (Maximum speed reversion, no punishment).
 mode = "audit"
 
-# DISCORD ACCOUNT PASSWORD (REQUIRED FOR AUTOMATIC MFA REVERSION)
-# Discord requires password-based 2FA/MFA elevation to update server vanity URLs.
-#  - Keep this password secure and never share it.
-#  - If incorrect or empty, attacker punishment will still work, but vanity reversion
-#    will fail unless MFA ticket is cached.
-#  - Successfully generated MFA tickets are cached in-memory for 270 seconds.
+# 2FA TOTP SECRET KEY (RECOMMENDED FOR AUTOMATIC MFA REVERSION)
+# Base32 setup key from Discord Authenticator App 2FA setup (NOT the 6-digit code).
+# Spaces, dashes, and letter casing are ignored.
+#  - See docs/2FA.md for step-by-step setup instructions.
+totp_secret = ""
+
+# DISCORD ACCOUNT PASSWORD (FALLBACK ONLY - NOT RECOMMENDED)
+# Only used if totp_secret is empty or Discord does not offer TOTP for the account.
+#  - Warning: Discord frequently rejects password-based MFA with code 60008
+#    ("Password does not match") even with the right password. Use totp_secret instead.
+#  - If both totp_secret and password are empty, attacker punishment still works,
+#    but vanity reversion will fail when Discord requires MFA.
 password = ""
 
 

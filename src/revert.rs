@@ -1,12 +1,58 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (c) 2026 Faiz
 
+use crate::totp::TotpKey;
 use anyhow::Result;
+use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::{LazyLock, RwLock};
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
+
+#[derive(Deserialize)]
+struct MfaChallengeBody {
+    code: Option<u32>,
+    mfa: Option<MfaRequest>,
+}
+
+#[derive(Deserialize)]
+struct MfaRequest {
+    ticket: String,
+    #[serde(default)]
+    methods: Vec<MfaMethod>,
+}
+
+#[derive(Deserialize)]
+struct MfaMethod {
+    #[serde(rename = "type")]
+    kind: String,
+}
+
+#[derive(Deserialize)]
+struct MfaFinishResponse {
+    token: String,
+}
+
+pub fn select_mfa_method(
+    methods: &[&str],
+    totp_key: Option<&TotpKey>,
+    password: Option<&str>,
+) -> Option<(&'static str, String)> {
+    let offers_totp = methods.contains(&"totp");
+    let offers_password = methods.contains(&"password");
+    let pwd = password.filter(|p| !p.trim().is_empty());
+
+    if let Some(key) = totp_key.filter(|_| offers_totp || methods.is_empty()) {
+        Some(("totp", key.generate()))
+    } else if let Some(p) = pwd.filter(|_| offers_password || !offers_totp) {
+        Some(("password", p.to_string()))
+    } else if let Some(key) = totp_key {
+        Some(("totp", key.generate()))
+    } else {
+        pwd.map(|p| ("password", p.to_string()))
+    }
+}
 
 struct CacheEntry {
     token: String,
@@ -76,6 +122,7 @@ pub async fn revert_vanity(
     http_client: &wreq::Client,
     guild_id: &str,
     target_code: &str,
+    totp_key: Option<&TotpKey>,
     password: Option<&str>,
 ) -> Result<bool> {
     let start = Instant::now();
@@ -150,36 +197,48 @@ pub async fn revert_vanity(
     }
 
     if status.as_u16() == 401 {
-        // mfa required: parse ticket and perform password-based authorization
         let body_text = resp.text().await.unwrap_or_default();
-        let body: serde_json::Value = serde_json::from_str(&body_text).unwrap_or_default();
-        let ticket = body
-            .get("mfa")
-            .and_then(|m| m.get("ticket"))
-            .and_then(|t| t.as_str());
+        let parsed: MfaChallengeBody = match serde_json::from_str(&body_text) {
+            Ok(p) => p,
+            Err(_) => {
+                error!("vanity revert 401 unauthorized without valid mfa payload");
+                return Ok(false);
+            }
+        };
 
-        let ticket = match ticket {
-            Some(t) => t,
-            None => {
+        if parsed.code != Some(60003) {
+            error!(
+                "vanity revert 401 unauthorized is not an mfa challenge (code={:?})",
+                parsed.code
+            );
+            return Ok(false);
+        }
+
+        let mfa = match parsed.mfa {
+            Some(m) if !m.ticket.is_empty() => m,
+            _ => {
                 error!("vanity revert 401 unauthorized without mfa ticket");
                 return Ok(false);
             }
         };
 
-        let pwd = match password {
-            Some(p) if !p.trim().is_empty() => p,
-            _ => {
-                warn!("mfa ticket received but account password is not configured in config.toml");
+        let method_kinds: Vec<&str> = mfa.methods.iter().map(|m| m.kind.as_str()).collect();
+        let (mfa_type, mfa_data) = match select_mfa_method(&method_kinds, totp_key, password) {
+            Some(pair) => pair,
+            None => {
+                warn!(
+                    "mfa required (methods={method_kinds:?}), but neither totp_secret nor password is configured in config.toml"
+                );
                 return Ok(false);
             }
         };
 
-        debug!("mfa ticket received, authenticating with password");
+        debug!("mfa ticket received, authenticating with {mfa_type}");
 
         let mfa_payload = json!({
-            "ticket": ticket,
-            "mfa_type": "password",
-            "data": pwd
+            "ticket": mfa.ticket,
+            "mfa_type": mfa_type,
+            "data": mfa_data
         });
 
         let mfa_resp = http_client
@@ -193,19 +252,22 @@ pub async fn revert_vanity(
         if !mfa_status.is_success() {
             let err_body = mfa_resp.text().await.unwrap_or_default();
             error!("failed to finish mfa authorization: status={mfa_status} body={err_body}");
+            if mfa_type == "password" && err_body.contains("60008") {
+                warn!(
+                    "discord rejected password mfa with code 60008; switch to totp_secret in [vanity] (see docs/2FA.md)"
+                );
+            }
             return Ok(false);
         }
 
-        let mfa_body: serde_json::Value = mfa_resp.json().await.unwrap_or_default();
-        let mfa_token = mfa_body.get("token").and_then(|t| t.as_str());
-
-        let mfa_token = match mfa_token {
-            Some(t) => t,
-            None => {
+        let mfa_body = match mfa_resp.json::<MfaFinishResponse>().await {
+            Ok(b) if !b.token.is_empty() => b,
+            _ => {
                 error!("mfa finish response did not contain token");
                 return Ok(false);
             }
         };
+        let mfa_token = mfa_body.token.as_str();
 
         // cache acquired mfa token for 270 seconds
         MFA_CACHE.set(guild_id, mfa_token);
